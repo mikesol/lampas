@@ -21,3 +21,5 @@ export {
 	type RetryPolicyInput,
 	RetryPolicySchema,
 } from "./job";
+
+export { type RetryState, computeBackoff, shouldRetry } from "./retry";

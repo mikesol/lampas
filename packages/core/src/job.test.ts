@@ -24,13 +24,14 @@ describe("RequestBodySchema", () => {
 			attempts: 3,
 			backoff: "exponential",
 			initial_delay_ms: 1000,
+			max_delay_ms: 30000,
 		});
 	});
 
 	it("accepts a request with explicit retry policy", () => {
 		const retry = { attempts: 5, backoff: "exponential" as const, initial_delay_ms: 2000 };
 		const result = RequestBodySchema.parse({ ...validRequest, retry });
-		expect(result.retry).toEqual(retry);
+		expect(result.retry).toEqual({ ...retry, max_delay_ms: 30000 });
 	});
 
 	it("accepts a request with callback headers", () => {

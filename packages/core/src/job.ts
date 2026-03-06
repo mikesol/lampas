@@ -30,12 +30,13 @@ export type Callback = z.infer<typeof CallbackSchema>;
  * Zod schema for retry policy.
  *
  * Controls how many times Lampas retries failed deliveries and the backoff strategy.
- * Fields have defaults: attempts=3, backoff="exponential", initial_delay_ms=1000.
+ * Fields have defaults: attempts=3, backoff="exponential", initial_delay_ms=1000, max_delay_ms=30000.
  */
 export const RetryPolicySchema = z.object({
 	attempts: z.number().int().min(1, "Retry attempts must be at least 1").default(3),
 	backoff: z.literal("exponential").default("exponential"),
 	initial_delay_ms: z.number().int().min(0, "Initial delay must be non-negative").default(1000),
+	max_delay_ms: z.number().int().min(1, "Max delay must be at least 1ms").default(30000),
 });
 
 /** Retry policy after Zod defaults have been applied. */
