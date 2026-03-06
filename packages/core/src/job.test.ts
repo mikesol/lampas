@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RequestBodySchema } from "./schema.js";
+import { RequestBodySchema } from "./job";
 
 const validRequest = {
 	target: "https://api.example.com/data",
