@@ -5,10 +5,12 @@ export {
 	CallbackSchema,
 	type Job,
 	JobSchema,
-	JobStatus,
+	type JobStatus,
 	JobStatusSchema,
 	type RequestBody,
+	type RequestBodyInput,
 	RequestBodySchema,
 	type RetryPolicy,
+	type RetryPolicyInput,
 	RetryPolicySchema,
 } from "./schema.js";
