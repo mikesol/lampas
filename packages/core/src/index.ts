@@ -20,4 +20,4 @@ export {
 	type RetryPolicy,
 	type RetryPolicyInput,
 	RetryPolicySchema,
-} from "./schema.js";
+} from "./job.js";
