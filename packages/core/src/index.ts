@@ -23,3 +23,5 @@ export {
 } from "./job";
 
 export { type RetryState, computeBackoff, shouldRetry } from "./retry";
+
+export type { JobStore, JobExecutor } from "./backend";
