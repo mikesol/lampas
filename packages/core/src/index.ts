@@ -1,6 +1,13 @@
 // @lampas/core — Job schema, envelope, retry logic, backend interface contracts
 
 export {
+	type Envelope,
+	EnvelopeSchema,
+	type UpstreamResponse,
+	buildEnvelope,
+} from "./envelope.js";
+
+export {
 	type Callback,
 	CallbackSchema,
 	type Job,
