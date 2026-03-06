@@ -16,5 +16,8 @@
 	},
 	"dependencies": {
 		"@lampas/core": "workspace:*"
+	},
+	"devDependencies": {
+		"@cloudflare/workers-types": "^4.20260306.1"
 	}
 }

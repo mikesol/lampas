@@ -23,6 +23,10 @@ importers:
       '@lampas/core':
         specifier: workspace:*
         version: link:../core
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^4.20260306.1
+        version: 4.20260306.1
 
   packages/core:
     dependencies:
@@ -84,6 +88,9 @@ packages:
     engines: {node: '>=14.21.3'}
     cpu: [x64]
     os: [win32]
+
+  '@cloudflare/workers-types@4.20260306.1':
+    resolution: {integrity: sha512-1gtiB0nm0Uji6VKHprvL1ZyFtdHZSR907lU2fbBioMurJAF4tQPoafJFJp4oeViUiMVUEqkp0Eh0dcbcKoHoow==}
 
   '@esbuild/aix-ppc64@0.27.3':
     resolution: {integrity: sha512-9fJMTNFTWZMh5qwrBItuziu834eOCUcEqymSH7pY+zoMVEZg3gcPuBNxH1EvfVYe9h0x/Ptw8KBzv7qxb7l8dg==}
@@ -665,6 +672,8 @@ snapshots:
 
   '@biomejs/cli-win32-x64@1.9.4':
     optional: true
+
+  '@cloudflare/workers-types@4.20260306.1': {}
 
   '@esbuild/aix-ppc64@0.27.3':
     optional: true
