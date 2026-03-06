@@ -1,0 +1,21 @@
+{
+	"compilerOptions": {
+		"strict": true,
+		"target": "ES2022",
+		"module": "ES2022",
+		"moduleResolution": "bundler",
+		"declaration": true,
+		"declarationMap": true,
+		"sourceMap": true,
+		"esModuleInterop": true,
+		"skipLibCheck": true,
+		"forceConsistentCasingInFileNames": true,
+		"resolveJsonModule": true,
+		"isolatedModules": true,
+		"composite": true,
+		"outDir": "dist",
+		"rootDir": "src"
+	},
+	"include": ["src"],
+	"references": [{ "path": "../core" }]
+}
