@@ -5,7 +5,7 @@ export {
 	EnvelopeSchema,
 	type UpstreamResponse,
 	buildEnvelope,
-} from "./envelope.js";
+} from "./envelope";
 
 export {
 	type Callback,
@@ -20,4 +20,4 @@ export {
 	type RetryPolicy,
 	type RetryPolicyInput,
 	RetryPolicySchema,
-} from "./job.js";
+} from "./job";

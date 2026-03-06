@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type UpstreamResponse, buildEnvelope } from "./envelope.js";
+import { type UpstreamResponse, buildEnvelope } from "./envelope";
 
 const JOB_ID = "job_abc123";
 const TARGET = "https://api.example.com/data";

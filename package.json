@@ -1,9 +1,9 @@
 {
-	"name": "lampas",
 	"private": true,
-	"workspaces": ["packages/*"],
+	"packageManager": "pnpm@10.6.3",
+	"type": "module",
 	"scripts": {
-		"build": "npm run build --workspaces",
+		"build": "pnpm -r run build",
 		"check": "biome check .",
 		"check:fix": "biome check --write .",
 		"test": "vitest run"
