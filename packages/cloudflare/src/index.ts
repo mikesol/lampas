@@ -1,3 +1,4 @@
 // @lampas/cloudflare — Cloudflare Workers + Durable Objects backend
 
-export { handleRequest } from "./worker";
+export { JobDO, type CallbackState, type Env } from "./job-do.js";
+export { default } from "./worker.js";

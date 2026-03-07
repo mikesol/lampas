@@ -1,4 +1,4 @@
-// @lampas/core — Job schema, envelope, retry logic, backend interface contracts
+// @lampas/core — Job schema, envelope, retry logic
 
 export {
 	type Envelope,
@@ -23,5 +23,3 @@ export {
 } from "./job";
 
 export { type RetryState, computeBackoff, shouldRetry } from "./retry";
-
-export type { JobStore, JobExecutor } from "./backend";
