@@ -12,12 +12,15 @@
 	},
 	"files": ["dist"],
 	"scripts": {
-		"build": "tsc -p tsconfig.json"
+		"build": "tsc -p tsconfig.json",
+		"test": "vitest run"
 	},
 	"dependencies": {
 		"@lampas/core": "workspace:*"
 	},
 	"devDependencies": {
-		"@cloudflare/workers-types": "^4.20260306.1"
+		"@cloudflare/vitest-pool-workers": "^0.8.0",
+		"@cloudflare/workers-types": "^4.20260306.1",
+		"wrangler": "^4.0.0"
 	}
 }
