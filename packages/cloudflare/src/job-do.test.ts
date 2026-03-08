@@ -8,14 +8,12 @@ const UPSTREAM_URL = `${UPSTREAM_ORIGIN}${UPSTREAM_PATH}`;
 const CB_ORIGIN = "https://hook.example.com";
 const CB_PATH = "/callback";
 const CB_URL = `${CB_ORIGIN}${CB_PATH}`;
-
 const validReq = {
 	target: UPSTREAM_URL,
 	forward_headers: { Authorization: "Bearer tok_123" },
 	callbacks: [{ url: CB_URL }],
 	body: { key: "value" },
 };
-
 type AnyRec = Record<string, unknown>;
 const stub = (id: string) => env.JOB_DO.get(env.JOB_DO.idFromName(id));
 
@@ -38,10 +36,10 @@ async function createJob(
 	return res;
 }
 
-function mockUpstream(status = 200, body: unknown = { result: "ok" }) {
+function mockUpstream(status = 200, body: unknown = { result: "ok" }, method = "POST") {
 	fetchMock
 		.get(UPSTREAM_ORIGIN)
-		.intercept({ path: UPSTREAM_PATH, method: "POST" })
+		.intercept({ path: UPSTREAM_PATH, method })
 		.reply(status, JSON.stringify(body), {
 			headers: { "content-type": "application/json" },
 		});
@@ -119,7 +117,6 @@ describe("job creation", () => {
 		expect(res.status).toBe(400);
 	});
 });
-
 describe("status query", () => {
 	it("returns job state", async () => {
 		const s = stub("status-ok");
@@ -141,7 +138,6 @@ describe("status query", () => {
 		expect(res.status).toBe(404);
 	});
 });
-
 describe("upstream execution", () => {
 	it("calls upstream and wipes forward_headers", async () => {
 		mockUpstream();
@@ -259,6 +255,32 @@ describe("retry exhaustion", () => {
 			await i.alarm();
 			expect(((await st.storage.get("cb:0")) as CallbackState).status).toBe("failed");
 			expect(((await st.storage.get("job")) as AnyRec).status).toBe("failed");
+		});
+	});
+});
+
+describe("HTTP method", () => {
+	it("uses GET when method is GET and ignores body", async () => {
+		mockUpstream(200, { result: "ok" }, "GET");
+		mockCb();
+		const s = stub("get-method");
+		const req = { ...validReq, method: "GET" };
+		await runInDurableObject(s, async (i: JobDO, st) => {
+			await createJob(i, st, "get-method", req);
+			await i.alarm();
+			expect(((await st.storage.get("upstream_response")) as AnyRec).status).toBe(200);
+			expect(((await st.storage.get("job")) as AnyRec).status).toBe("completed");
+		});
+	});
+
+	it("defaults to POST when method is omitted", async () => {
+		mockUpstream();
+		mockCb();
+		const s = stub("default-post");
+		await runInDurableObject(s, async (i: JobDO, st) => {
+			await createJob(i, st, "default-post");
+			await i.alarm();
+			expect(((await st.storage.get("upstream_response")) as AnyRec).status).toBe(200);
 		});
 	});
 });

@@ -117,11 +117,20 @@ export class JobDO implements DurableObject {
 
 		let upstream: UpstreamResponse;
 		try {
+			const method = job.request.method ?? "POST";
+			const hasBody = method !== "GET" && method !== "HEAD";
+			const controller = new AbortController();
+			const timeoutMs = job.request.timeout_ms ?? 30000;
+			const timer = setTimeout(() => controller.abort(), timeoutMs);
+
 			const response = await fetch(job.request.target, {
-				method: "POST",
+				method,
 				headers: forwardHeaders ?? {},
-				body: serializeBody(job.request.body),
+				body: hasBody ? serializeBody(job.request.body) : null,
+				signal: controller.signal,
 			});
+
+			clearTimeout(timer);
 
 			const headers: Record<string, string> = {};
 			response.headers.forEach((v, k) => {

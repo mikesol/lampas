@@ -46,6 +46,16 @@ export type RetryPolicy = z.infer<typeof RetryPolicySchema>;
 export type RetryPolicyInput = z.input<typeof RetryPolicySchema>;
 
 /**
+ * Allowed HTTP methods for the upstream request.
+ */
+export const HttpMethodSchema = z
+	.enum(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"])
+	.default("POST");
+
+/** Union of allowed HTTP method values. */
+export type HttpMethod = z.infer<typeof HttpMethodSchema>;
+
+/**
  * Zod schema for the Lampas request body.
  *
  * Contains the complete execution specification: what to call, where to deliver
@@ -53,9 +63,16 @@ export type RetryPolicyInput = z.input<typeof RetryPolicySchema>;
  */
 export const RequestBodySchema = z.object({
 	target: z.string().url("Target must be a valid URL"),
+	method: HttpMethodSchema,
 	forward_headers: z.record(z.string(), z.string()),
 	callbacks: z.array(CallbackSchema).min(1, "At least one callback is required"),
 	retry: RetryPolicySchema.optional(),
+	timeout_ms: z
+		.number()
+		.int()
+		.min(1000, "Timeout must be at least 1000ms")
+		.max(300000, "Timeout must be at most 300000ms")
+		.default(30000),
 	body: z.unknown(),
 });
 

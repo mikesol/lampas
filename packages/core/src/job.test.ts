@@ -97,4 +97,39 @@ describe("RequestBodySchema", () => {
 		const result = RequestBodySchema.safeParse({ ...validRequest, body: null });
 		expect(result.success).toBe(true);
 	});
+
+	it("defaults method to POST when omitted", () => {
+		const result = RequestBodySchema.parse(validRequest);
+		expect(result.method).toBe("POST");
+	});
+
+	it("accepts explicit method", () => {
+		const result = RequestBodySchema.parse({ ...validRequest, method: "GET" });
+		expect(result.method).toBe("GET");
+	});
+
+	it("rejects invalid method", () => {
+		const result = RequestBodySchema.safeParse({ ...validRequest, method: "INVALID" });
+		expect(result.success).toBe(false);
+	});
+
+	it("defaults timeout_ms to 30000 when omitted", () => {
+		const result = RequestBodySchema.parse(validRequest);
+		expect(result.timeout_ms).toBe(30000);
+	});
+
+	it("accepts explicit timeout_ms", () => {
+		const result = RequestBodySchema.parse({ ...validRequest, timeout_ms: 60000 });
+		expect(result.timeout_ms).toBe(60000);
+	});
+
+	it("rejects timeout_ms below 1000", () => {
+		const result = RequestBodySchema.safeParse({ ...validRequest, timeout_ms: 500 });
+		expect(result.success).toBe(false);
+	});
+
+	it("rejects timeout_ms above 300000", () => {
+		const result = RequestBodySchema.safeParse({ ...validRequest, timeout_ms: 400000 });
+		expect(result.success).toBe(false);
+	});
 });
