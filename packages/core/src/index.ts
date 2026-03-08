@@ -10,6 +10,8 @@ export {
 export {
 	type Callback,
 	CallbackSchema,
+	type HttpMethod,
+	HttpMethodSchema,
 	type Job,
 	JobSchema,
 	type JobStatus,
