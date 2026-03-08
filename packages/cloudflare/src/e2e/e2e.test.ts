@@ -25,7 +25,14 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-	worker?.kill();
+	// Kill the entire process group (npx -> wrangler -> workerd)
+	if (worker?.pid) {
+		try {
+			process.kill(-worker.pid, "SIGKILL");
+		} catch {
+			worker.kill("SIGKILL");
+		}
+	}
 	await upstream?.close();
 	await callback?.close();
 });

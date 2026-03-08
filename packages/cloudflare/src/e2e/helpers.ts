@@ -13,6 +13,7 @@ export async function startWorker(): Promise<ChildProcess> {
 		cwd: new URL("../..", import.meta.url).pathname,
 		stdio: "pipe",
 		env: { ...process.env, NODE_ENV: "test" },
+		detached: true,
 	});
 
 	child.stderr?.on("data", (chunk: Buffer) => {
@@ -173,14 +174,20 @@ export async function createMockCallback(port = 9002): Promise<MockCallback> {
 			requests.set(reqPath, list);
 
 			// Resolve only the first matching waiter (FIFO)
+			let resolvedViaWaiter = false;
 			for (let i = 0; i < waiters.length; i++) {
 				if (waiters[i].path === reqPath) {
 					const waiter = waiters[i];
 					clearTimeout(waiter.timer);
 					waiter.resolve(captured);
 					waiters.splice(i, 1);
+					resolvedViaWaiter = true;
 					break;
 				}
+			}
+			// Track consumption so future waitForRequest calls skip this request
+			if (resolvedViaWaiter) {
+				consumedCounts.set(reqPath, (consumedCounts.get(reqPath) ?? 0) + 1);
 			}
 
 			const status = getStatusForPath(reqPath);
