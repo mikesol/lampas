@@ -6,7 +6,7 @@
 		"build": "pnpm -r run build",
 		"check": "biome check .",
 		"check:fix": "biome check --write .",
-		"test": "vitest run && pnpm --filter @lampas/cloudflare test"
+		"test": "vitest run && pnpm --filter @lampas/cloudflare test && pnpm --filter @lampas/cloudflare test:e2e"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.0",
