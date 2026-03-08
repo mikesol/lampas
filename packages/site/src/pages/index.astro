@@ -42,7 +42,17 @@ const statusExample = "curl https://lampas.dev/jobs/aaaaaaaa-bbbb-cccc-dddd-eeee
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 		<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@300;400;500&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet" />
+		<script is:inline>
+			document.documentElement.classList.add("fonts-loading");
+			document.fonts.ready.then(() => document.documentElement.classList.remove("fonts-loading"));
+		</script>
 		<style is:global>
+			html.fonts-loading body {
+				opacity: 0;
+			}
+			body {
+				transition: opacity 0.1s ease-in;
+			}
 			:root {
 				--bg: #faf9f6;
 				--text: #2c2825;
