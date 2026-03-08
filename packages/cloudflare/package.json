@@ -14,7 +14,9 @@
 	"scripts": {
 		"build": "tsc -p tsconfig.json",
 		"test": "vitest run",
-		"test:e2e": "vitest run --config vitest.e2e.config.ts"
+		"test:e2e": "vitest run --config vitest.e2e.config.ts",
+		"deploy": "wrangler deploy",
+		"deploy:production": "wrangler deploy --env production"
 	},
 	"dependencies": {
 		"@lampas/core": "workspace:*"
