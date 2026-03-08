@@ -1,0 +1,272 @@
+---
+const envelopeExample = `{
+  "lampas_job_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+  "lampas_status": "completed",
+  "lampas_target": "https://api.anthropic.com/v1/messages",
+  "lampas_delivered_at": "2026-03-06T08:31:00Z",
+  "response_status": 200,
+  "response_headers": { "content-type": "application/json" },
+  "response_body": { ... }
+}`;
+
+const curlExample = `curl https://lampas.dev/forward \\
+  -H "content-type: application/json" \\
+  -d '{
+    "target": "https://api.anthropic.com/v1/messages",
+    "forward_headers": {
+      "x-api-key": "YOUR_API_KEY",
+      "anthropic-version": "2023-06-01"
+    },
+    "callbacks": [
+      { "url": "https://your-webhook.example.com" }
+    ],
+    "retry": { "attempts": 3, "backoff": "exponential" },
+    "body": {
+      "model": "claude-opus-4-5",
+      "max_tokens": 1024,
+      "messages": [{"role": "user", "content": "Hello."}]
+    }
+  }'`;
+
+const jobResponse = `{ "job_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "status": "queued" }`;
+
+const statusExample = "curl https://lampas.dev/jobs/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+---
+
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Lampas</title>
+		<meta name="description" content="Lampas is an open-source proxy that turns any API call into a webhook. Send a request, exit immediately, and get the response delivered to your callback URLs." />
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@300;400;500&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet" />
+		<style is:global>
+			:root {
+				--bg: #faf9f6;
+				--text: #2c2825;
+				--text-light: #7a7470;
+				--rule: #ddd8d2;
+				--code-bg: #f1efeb;
+				--code-border: #e4e0da;
+			}
+			* { margin: 0; padding: 0; box-sizing: border-box; }
+			body {
+				font-family: "Hanken Grotesk", -apple-system, sans-serif;
+				color: var(--text);
+				background: var(--bg);
+				line-height: 1.75;
+				font-size: 18px;
+				font-weight: 300;
+				padding: 10rem 1.5rem 8rem;
+				-webkit-font-smoothing: antialiased;
+			}
+			article {
+				max-width: 640px;
+				margin: 0 auto;
+			}
+			h2 {
+				font-family: "Hanken Grotesk", -apple-system, sans-serif;
+				font-size: 0.82rem;
+				font-weight: 500;
+				letter-spacing: 0.12em;
+				text-transform: uppercase;
+				margin-bottom: 1.25rem;
+				color: var(--text);
+			}
+			.section {
+				padding: 2.75rem 0;
+				border-top: 1px solid var(--rule);
+			}
+			.section:first-of-type {
+				border-top: none;
+				padding-top: 0;
+			}
+			p {
+				margin-bottom: 1.1rem;
+			}
+			p:last-child {
+				margin-bottom: 0;
+			}
+			a {
+				color: var(--text);
+				text-decoration: underline;
+				text-decoration-color: var(--rule);
+				text-underline-offset: 3px;
+				text-decoration-thickness: 1px;
+				transition: text-decoration-color 0.2s;
+			}
+			a:hover {
+				text-decoration-color: var(--text);
+			}
+			code {
+				font-family: "JetBrains Mono", monospace;
+				font-size: 0.82em;
+				background: var(--code-bg);
+				padding: 0.15em 0.4em;
+				border-radius: 3px;
+				border: 1px solid var(--code-border);
+			}
+			pre {
+				background: var(--code-bg);
+				border: 1px solid var(--code-border);
+				padding: 1.5rem;
+				overflow-x: auto;
+				margin: 1.25rem 0;
+				border-radius: 4px;
+				line-height: 1.6;
+			}
+			pre code {
+				background: none;
+				padding: 0;
+				border: none;
+				font-size: 0.8em;
+			}
+			strong {
+				font-weight: 400;
+			}
+			dl {
+				margin: 1.25rem 0;
+			}
+			dt {
+				font-family: "JetBrains Mono", monospace;
+				font-size: 0.82em;
+				font-weight: 400;
+				margin-top: 1rem;
+				color: var(--text);
+			}
+			dt:first-child {
+				margin-top: 0;
+			}
+			dd {
+				margin-left: 0;
+				margin-top: 0.2rem;
+				color: var(--text-light);
+				font-size: 0.95em;
+				line-height: 1.7;
+			}
+			.source {
+				margin-top: 3.5rem;
+				padding-top: 2.75rem;
+				border-top: 1px solid var(--rule);
+				color: var(--text-light);
+				font-size: 0.9em;
+			}
+			.source a {
+				color: var(--text-light);
+			}
+		</style>
+	</head>
+	<body>
+		<article>
+			<section class="section">
+				<h2>What Lampas Is</h2>
+				<p>
+					Lampas is an open-source proxy that decouples the caller from the call. You send Lampas a request describing which API to call, what credentials to forward, and where to deliver the response. Lampas makes the upstream call on your behalf and, when the response arrives, delivers it to the callback URLs you specified. The original caller is free to exit immediately after submitting the job.
+				</p>
+			</section>
+
+			<section class="section">
+				<h2>Why This Exists</h2>
+				<p>
+					HTTP's request-response model assumes that the caller persists for the duration of the call. This assumption made sense when servers were long-lived processes with stable addresses, but it breaks down in a world of ephemeral compute. Serverless functions, disposable VMs, and autonomous agents all share a common problem: they may not exist by the time the API they called gets around to responding.
+				</p>
+				<p>
+					The usual workarounds are familiar to anyone who has built on serverless infrastructure. You can have a Lambda function idle while it waits for OpenAI to finish thinking, paying for compute that does nothing. You can poll on a cron schedule using something like Inngest or Temporal, adding architectural complexity for what is fundamentally a simple operation. Or you can restructure your application around a message queue, which solves the problem at the cost of adopting an entirely new programming model.
+				</p>
+				<p>
+					Lampas takes a different approach. It acts as a relay that holds the connection open on your behalf and pushes the result to you when it is ready. No queue to manage, no idle compute, no polling infrastructure. You describe the call, fire it, and walk away.
+				</p>
+			</section>
+
+			<section class="section">
+				<h2>How It Works</h2>
+				<p>
+					A Lampas request is a JSON object that contains its own complete execution specification. There is nothing to configure ahead of time &mdash; no registered webhooks, no control plane, no dashboard. Everything the proxy needs to know is in the request body.
+				</p>
+				<p>
+					The request is built around five fields:
+				</p>
+				<dl>
+					<dt>target</dt>
+					<dd>The upstream API URL. Lampas forwards your request to this endpoint faithfully, adding nothing of its own.</dd>
+
+					<dt>method</dt>
+					<dd>The HTTP method to use for the upstream call. Defaults to POST if omitted.</dd>
+
+					<dt>forward_headers</dt>
+					<dd>Headers to include in the upstream request, such as API keys and auth tokens. These are used for the call and then discarded &mdash; Lampas never persists credentials.</dd>
+
+					<dt>callbacks</dt>
+					<dd>An array of URLs where the response should be delivered. Multiple entries mean fan-out: the same response is delivered to each destination independently. Each callback supports custom headers for correlation IDs.</dd>
+
+					<dt>retry</dt>
+					<dd>The policy for retrying failed callback deliveries. Supports configurable attempt counts and exponential backoff. If omitted, Lampas uses a default of 3 attempts with exponential backoff starting at 1 second.</dd>
+				</dl>
+				<p>
+					This design is inspired by continuation-passing style: the "what to do next" travels with the work itself rather than being stored somewhere else. Any HTTP client can speak the Lampas protocol without an SDK or prior setup.
+				</p>
+				<p>
+					When the upstream responds, Lampas wraps the result in an envelope that preserves the original response verbatim &mdash; status code, headers, and body &mdash; and adds metadata for correlation:
+				</p>
+				<pre><code>{envelopeExample}</code></pre>
+				<p>
+					If the upstream returns a 500 with a malformed body, that is exactly what the callback receives. Lampas does not parse, transform, or interpret the upstream response in any way.
+				</p>
+			</section>
+
+			<section class="section">
+				<h2>Try It</h2>
+				<p>
+					The following command sends a request through the live Lampas instance. Replace the callback URL with your own endpoint &mdash; <a href="https://webhook.site">webhook.site</a> works well for testing.
+				</p>
+				<pre><code>{curlExample}</code></pre>
+				<p>
+					Lampas responds immediately with a job ID:
+				</p>
+				<pre><code>{jobResponse}</code></pre>
+				<p>
+					You can check the status of any job by its ID:
+				</p>
+				<pre><code>{statusExample}</code></pre>
+				<p>
+					Polling and callbacks are two views of the same underlying mechanism. You can use either or both depending on what your architecture supports.
+				</p>
+			</section>
+
+			<section class="section">
+				<h2>Design Principles</h2>
+				<p>
+					<strong>The request is the spec.</strong> All execution behavior &mdash; target, callbacks, retry policy, forwarded credentials &mdash; is specified in the request body. A Lampas deployment has no per-user state, no registered endpoints, and no stored configuration.
+				</p>
+				<p>
+					<strong>Credentials are never stored.</strong> API keys and auth headers are supplied by the caller, forwarded to the upstream target during job execution, and then discarded. No credential ever touches durable storage.
+				</p>
+				<p>
+					<strong>The upstream response is preserved verbatim.</strong> Lampas wraps the response in an envelope for metadata, but the response itself &mdash; status, headers, body &mdash; is delivered exactly as the upstream returned it.
+				</p>
+				<p>
+					<strong>Callbacks are best-effort with bounded retry.</strong> Lampas retries failed deliveries according to the policy in the request. If all attempts are exhausted, the job is marked as failed and the result remains queryable by job ID.
+				</p>
+				<p>
+					<strong>Fan-out is structural, not special.</strong> The callbacks field is always an array. Delivering to one callback and delivering to ten use the same code path at different cardinalities.
+				</p>
+			</section>
+
+			<section class="section">
+				<h2>The Name</h2>
+				<p>
+					Lampas (&Lambda;&alpha;&mu;&pi;&#940;&sigmaf;) is the ancient Greek torch race &mdash; the Lampadedromia &mdash; in which runners posted at intervals passed a lit torch down the line, each sprinting at full speed before handing off to the next. The winner was the first team to carry the torch across the finish line with the flame still burning.
+				</p>
+				<p>
+					Lampas the software carries a response from the moment the caller dissolves to the moment the callback receives it, across a gap where HTTP usually demands that someone stand and wait. The torch must arrive lit, but the original runner need not survive the race.
+				</p>
+			</section>
+
+			<p class="source">
+				<a href="https://github.com/mikesol/lampas">Source on GitHub</a>
+			</p>
+		</article>
+	</body>
+</html>
