@@ -10,8 +10,13 @@ const WORKER_BASE = "http://localhost:8787";
  */
 export async function startWorker(): Promise<ChildProcess> {
 	const child = spawn("npx", ["wrangler", "dev", "--port", "8787"], {
-		cwd: new URL("../../..", import.meta.url).pathname,
+		cwd: new URL("../..", import.meta.url).pathname,
 		stdio: "pipe",
+		env: { ...process.env, NODE_ENV: "test" },
+	});
+
+	child.stderr?.on("data", (chunk: Buffer) => {
+		if (process.env.DEBUG_E2E) console.error("[wrangler]", chunk.toString());
 	});
 
 	await waitForReady(WORKER_BASE, 30_000);
@@ -133,6 +138,7 @@ interface Waiter {
  */
 export async function createMockCallback(port = 9002): Promise<MockCallback> {
 	const requests = new Map<string, CapturedRequest[]>();
+	const consumedCounts = new Map<string, number>();
 	const statusOverrides = new Map<string, number>();
 	const statusSequences = new Map<string, number[]>();
 	const waiters: Waiter[] = [];
@@ -166,13 +172,14 @@ export async function createMockCallback(port = 9002): Promise<MockCallback> {
 			list.push(captured);
 			requests.set(reqPath, list);
 
-			// Resolve any matching waiters
-			for (let i = waiters.length - 1; i >= 0; i--) {
+			// Resolve only the first matching waiter (FIFO)
+			for (let i = 0; i < waiters.length; i++) {
 				if (waiters[i].path === reqPath) {
 					const waiter = waiters[i];
 					clearTimeout(waiter.timer);
 					waiter.resolve(captured);
 					waiters.splice(i, 1);
+					break;
 				}
 			}
 
@@ -188,10 +195,12 @@ export async function createMockCallback(port = 9002): Promise<MockCallback> {
 
 	return {
 		waitForRequest(path: string, timeoutMs = 10_000): Promise<CapturedRequest> {
-			// Check if we already have a matching request
+			// Check if we already have an unconsumed matching request
 			const existing = requests.get(path);
-			if (existing && existing.length > 0) {
-				return Promise.resolve(existing[existing.length - 1]);
+			const consumed = consumedCounts.get(path) ?? 0;
+			if (existing && existing.length > consumed) {
+				consumedCounts.set(path, consumed + 1);
+				return Promise.resolve(existing[consumed]);
 			}
 
 			return new Promise<CapturedRequest>((resolve, reject) => {
@@ -221,6 +230,7 @@ export async function createMockCallback(port = 9002): Promise<MockCallback> {
 
 		reset() {
 			requests.clear();
+			consumedCounts.clear();
 			statusOverrides.clear();
 			statusSequences.clear();
 			for (const waiter of waiters) {
