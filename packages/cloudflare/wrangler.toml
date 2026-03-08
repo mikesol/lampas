@@ -9,7 +9,3 @@ class_name = "JobDO"
 [[migrations]]
 tag = "v1"
 new_classes = ["JobDO"]
-
-# Production environment
-[env.production]
-routes = [{ pattern = "lampas.dev/*", zone_name = "lampas.dev" }]
