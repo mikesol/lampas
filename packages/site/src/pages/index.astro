@@ -166,6 +166,13 @@ const statusExample = "curl https://lampas.dev/jobs/aaaaaaaa-bbbb-cccc-dddd-eeee
 			.source a {
 				color: var(--text-light);
 			}
+			.aside {
+				font-size: 0.9em;
+				color: var(--text-light);
+			}
+			.aside strong {
+				color: var(--text);
+			}
 		</style>
 	</head>
 	<body>
@@ -242,6 +249,12 @@ const statusExample = "curl https://lampas.dev/jobs/aaaaaaaa-bbbb-cccc-dddd-eeee
 				<pre><code>{statusExample}</code></pre>
 				<p>
 					Polling and callbacks are two views of the same underlying mechanism. You can use either or both depending on what your architecture supports.
+				</p>
+			</section>
+
+			<section class="section aside">
+				<p>
+					<strong>Just so you know,</strong> the hosted instance at <code>lampas.dev</code> is a proof-of-concept for experimentation, not a production service. It is rate-limited but unauthenticated — anyone can send requests. Do not rely on it for production workloads. If you need guarantees, <a href="https://github.com/mikesol/lampas">self-host your own instance</a> or ask your agent to replicate the concept.
 				</p>
 			</section>
 
