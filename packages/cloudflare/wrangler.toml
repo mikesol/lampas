@@ -9,3 +9,7 @@ class_name = "JobDO"
 [[migrations]]
 tag = "v1"
 new_classes = ["JobDO"]
+
+[vars]
+SSRF_BLOCK_PRIVATE = "true"
+SSRF_ALLOWLIST = ""

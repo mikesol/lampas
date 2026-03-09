@@ -1,42 +1,15 @@
-import {
-	type Callback,
-	type Envelope,
-	type Job,
-	type JobStatus,
-	RequestBodySchema,
-	type RetryPolicy,
-	RetryPolicySchema,
-	type UpstreamResponse,
-	buildEnvelope,
-	computeBackoff,
-	shouldRetry,
-} from "@lampas/core";
+import { type Job, RequestBodySchema, type SsrfPolicy, parseSsrfPolicy } from "@lampas/core";
+import { type CallbackState, executeAndDeliver, retryPendingCallbacks } from "./delivery.js";
+import { jsonResponse } from "./http.js";
+import { validateRequestSsrf } from "./ssrf-guard.js";
 
-/** Per-callback delivery tracking state. */
-export interface CallbackState {
-	status: "pending" | "delivered" | "failed";
-	attempts: number;
-	next_retry_at: number | null;
-}
+export type { CallbackState };
 
 /** Cloudflare Worker environment bindings. */
 export interface Env {
 	JOB_DO: DurableObjectNamespace;
-}
-
-const DEFAULT_RETRY_POLICY: RetryPolicy = RetryPolicySchema.parse({});
-
-function serializeBody(body: unknown): BodyInit | null {
-	if (body === null || body === undefined) return null;
-	if (typeof body === "string") return body;
-	return JSON.stringify(body);
-}
-
-function jsonResponse(status: number, body: unknown): Response {
-	return new Response(JSON.stringify(body), {
-		status,
-		headers: { "Content-Type": "application/json" },
-	});
+	SSRF_BLOCK_PRIVATE?: string;
+	SSRF_ALLOWLIST?: string;
 }
 
 /** Durable Object that owns the full lifecycle of a Lampas job. */
@@ -61,9 +34,9 @@ export class JobDO implements DurableObject {
 		if (!job) return;
 
 		if (job.status === "queued") {
-			await this.executeAndDeliver(job);
+			await executeAndDeliver(this.ctx.storage, job);
 		} else if (job.status === "in_progress") {
-			await this.retryPendingCallbacks(job);
+			await retryPendingCallbacks(this.ctx.storage, job);
 		}
 	}
 
@@ -84,6 +57,15 @@ export class JobDO implements DurableObject {
 		if (!result.success) {
 			const messages = result.error.issues.map((i) => i.message);
 			return jsonResponse(400, { error: messages.join("; ") });
+		}
+
+		const ssrfCheck = await validateRequestSsrf(
+			result.data.target,
+			result.data.callbacks,
+			this.getSsrfPolicy(),
+		);
+		if (!ssrfCheck.ok) {
+			return jsonResponse(400, { error: `SSRF blocked: ${ssrfCheck.reason}` });
 		}
 
 		const now = new Date().toISOString();
@@ -110,187 +92,7 @@ export class JobDO implements DurableObject {
 		return jsonResponse(200, job);
 	}
 
-	private async executeAndDeliver(job: Job): Promise<void> {
-		await this.updateStatus("in_progress");
-
-		const forwardHeaders = await this.ctx.storage.get<Record<string, string>>("forward_headers");
-
-		let upstream: UpstreamResponse;
-		try {
-			const method = job.request.method ?? "POST";
-			const hasBody = method !== "GET" && method !== "HEAD";
-			const controller = new AbortController();
-			const timeoutMs = job.request.timeout_ms ?? 30000;
-			const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-			const response = await fetch(job.request.target, {
-				method,
-				headers: forwardHeaders ?? {},
-				body: hasBody ? serializeBody(job.request.body) : null,
-				signal: controller.signal,
-			});
-
-			clearTimeout(timer);
-
-			const headers: Record<string, string> = {};
-			response.headers.forEach((v, k) => {
-				headers[k] = v;
-			});
-
-			let body: unknown;
-			const text = await response.text();
-			try {
-				body = JSON.parse(text);
-			} catch {
-				body = text;
-			}
-
-			upstream = { status: response.status, headers, body };
-		} catch {
-			upstream = { status: 0, headers: {}, body: null };
-		}
-
-		await this.ctx.storage.put("upstream_response", upstream);
-		await this.ctx.storage.delete("forward_headers");
-
-		const envelope = buildEnvelope(job.id, job.request.target, upstream, new Date().toISOString());
-
-		await this.deliverAllCallbacks(job, envelope);
-	}
-
-	private async deliverAllCallbacks(job: Job, envelope: Envelope): Promise<void> {
-		const retryPolicy = this.getRetryPolicy(job);
-
-		const results = await Promise.all(
-			job.request.callbacks.map((cb) => this.deliverOne(cb, envelope)),
-		);
-
-		const now = Date.now();
-		let earliestRetry: number | null = null;
-
-		for (let i = 0; i < results.length; i++) {
-			let state: CallbackState;
-			if (results[i]) {
-				state = { status: "delivered", attempts: 1, next_retry_at: null };
-			} else if (shouldRetry(1, retryPolicy)) {
-				const delay = computeBackoff(0, retryPolicy);
-				const nextRetry = now + delay;
-				state = { status: "pending", attempts: 1, next_retry_at: nextRetry };
-				if (earliestRetry === null || nextRetry < earliestRetry) earliestRetry = nextRetry;
-			} else {
-				state = { status: "failed", attempts: 1, next_retry_at: null };
-			}
-			await this.ctx.storage.put(`cb:${i}`, state);
-		}
-
-		await this.resolveJobStatus(job);
-		if (earliestRetry !== null) {
-			await this.ctx.storage.setAlarm(earliestRetry);
-		}
-	}
-
-	private async retryPendingCallbacks(job: Job): Promise<void> {
-		const upstreamResponse = await this.ctx.storage.get<UpstreamResponse>("upstream_response");
-		if (!upstreamResponse) return;
-
-		const retryPolicy = this.getRetryPolicy(job);
-		const envelope = buildEnvelope(
-			job.id,
-			job.request.target,
-			upstreamResponse,
-			new Date().toISOString(),
-		);
-
-		const now = Date.now();
-		let earliestRetry: number | null = null;
-
-		for (let i = 0; i < job.request.callbacks.length; i++) {
-			const state = await this.ctx.storage.get<CallbackState>(`cb:${i}`);
-			if (!state || state.status !== "pending") continue;
-
-			if (state.next_retry_at && state.next_retry_at > now) {
-				if (earliestRetry === null || state.next_retry_at < earliestRetry) {
-					earliestRetry = state.next_retry_at;
-				}
-				continue;
-			}
-
-			const success = await this.deliverOne(job.request.callbacks[i], envelope);
-			const newAttempts = state.attempts + 1;
-
-			if (success) {
-				await this.ctx.storage.put(`cb:${i}`, {
-					status: "delivered",
-					attempts: newAttempts,
-					next_retry_at: null,
-				} satisfies CallbackState);
-			} else if (shouldRetry(newAttempts, retryPolicy)) {
-				const delay = computeBackoff(state.attempts, retryPolicy);
-				const nextRetry = now + delay;
-				await this.ctx.storage.put(`cb:${i}`, {
-					status: "pending",
-					attempts: newAttempts,
-					next_retry_at: nextRetry,
-				} satisfies CallbackState);
-				if (earliestRetry === null || nextRetry < earliestRetry) earliestRetry = nextRetry;
-			} else {
-				await this.ctx.storage.put(`cb:${i}`, {
-					status: "failed",
-					attempts: newAttempts,
-					next_retry_at: null,
-				} satisfies CallbackState);
-			}
-		}
-
-		await this.resolveJobStatus(job);
-		if (earliestRetry !== null) {
-			await this.ctx.storage.setAlarm(earliestRetry);
-		}
-	}
-
-	private async deliverOne(callback: Callback, envelope: Envelope): Promise<boolean> {
-		try {
-			const response = await fetch(callback.url, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					...(callback.headers ?? {}),
-				},
-				body: JSON.stringify(envelope),
-			});
-			return response.status >= 200 && response.status < 300;
-		} catch {
-			return false;
-		}
-	}
-
-	private async resolveJobStatus(job: Job): Promise<void> {
-		const states: CallbackState[] = [];
-		for (let i = 0; i < job.request.callbacks.length; i++) {
-			const state = await this.ctx.storage.get<CallbackState>(`cb:${i}`);
-			if (state) states.push(state);
-		}
-		if (states.length === 0) return;
-
-		if (states.every((s) => s.status === "delivered")) {
-			await this.updateStatus("completed");
-		} else if (
-			states.some((s) => s.status === "failed") &&
-			!states.some((s) => s.status === "pending")
-		) {
-			await this.updateStatus("failed");
-		}
-	}
-
-	private async updateStatus(status: JobStatus): Promise<void> {
-		const job = await this.ctx.storage.get<Job>("job");
-		if (!job) return;
-		job.status = status;
-		job.updated_at = new Date().toISOString();
-		await this.ctx.storage.put("job", job);
-	}
-
-	private getRetryPolicy(job: Job): RetryPolicy {
-		return job.request.retry ?? DEFAULT_RETRY_POLICY;
+	private getSsrfPolicy(): SsrfPolicy {
+		return parseSsrfPolicy(this.env.SSRF_BLOCK_PRIVATE, this.env.SSRF_ALLOWLIST);
 	}
 }
