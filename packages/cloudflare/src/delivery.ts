@@ -21,6 +21,58 @@ export interface CallbackState {
 
 const DEFAULT_RETRY_POLICY: RetryPolicy = RetryPolicySchema.parse({});
 
+/**
+ * Reconstruct a final JSON response from an SSE stream (e.g., Anthropic streaming API).
+ * Concatenates text deltas from content_block_delta events into a single response object.
+ */
+function reconstructFromSSE(sseText: string): unknown {
+	const textParts: string[] = [];
+	let stopReason: string | null = null;
+	let model: string | undefined;
+	let usage: unknown = undefined;
+
+	for (const line of sseText.split("\n")) {
+		if (!line.startsWith("data: ")) continue;
+		const dataStr = line.slice(6);
+		if (dataStr === "[DONE]") break;
+
+		let event: Record<string, unknown>;
+		try {
+			event = JSON.parse(dataStr);
+		} catch {
+			continue;
+		}
+
+		if (event.type === "content_block_delta") {
+			const delta = event.delta as Record<string, unknown> | undefined;
+			if (delta?.type === "text_delta" && typeof delta.text === "string") {
+				textParts.push(delta.text);
+			}
+		} else if (event.type === "message_start") {
+			const message = event.message as Record<string, unknown> | undefined;
+			if (message) {
+				model = message.model as string | undefined;
+			}
+		} else if (event.type === "message_delta") {
+			const delta = event.delta as Record<string, unknown> | undefined;
+			if (delta?.stop_reason) stopReason = delta.stop_reason as string;
+			if (event.usage) usage = event.usage;
+		}
+	}
+
+	if (textParts.length === 0) {
+		// Couldn't parse SSE, return raw text
+		return sseText;
+	}
+
+	return {
+		content: [{ type: "text", text: textParts.join("") }],
+		model,
+		stop_reason: stopReason,
+		usage,
+	};
+}
+
 /** Execute the upstream request and deliver the envelope to all callbacks. */
 export async function executeAndDeliver(storage: DurableObjectStorage, job: Job): Promise<void> {
 	await updateStatus(storage, "in_progress");
@@ -50,11 +102,18 @@ export async function executeAndDeliver(storage: DurableObjectStorage, job: Job)
 		});
 
 		let body: unknown;
+		const contentType = response.headers.get("content-type") ?? "";
 		const text = await response.text();
-		try {
-			body = JSON.parse(text);
-		} catch {
-			body = text;
+
+		if (contentType.includes("text/event-stream")) {
+			// Parse SSE stream (e.g., Anthropic streaming API) and reconstruct final response
+			body = reconstructFromSSE(text);
+		} else {
+			try {
+				body = JSON.parse(text);
+			} catch {
+				body = text;
+			}
 		}
 
 		upstream = { status: response.status, headers, body };
